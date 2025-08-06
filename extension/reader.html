@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Reader</title>
+    <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+    <div class="reader-container">
+        <!-- Header -->
+        <header class="reader-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <button class="back-button" id="backButton">
+                        ← Back to Extension
+                    </button>
+                </div>
+                <div class="header-center">
+                    <h1 class="article-title" id="articleTitle">Loading...</h1>
+                    <div class="article-meta" id="articleMeta">
+                        <span class="author" id="articleAuthor">Unknown</span>
+                        <span class="separator">•</span>
+                        <span class="word-count" id="articleWordCount">0 words</span>
+                        <span class="separator">•</span>
+                        <span class="reading-time" id="articleReadingTime">0 min read</span>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-actions">
+                        <button class="action-button" id="downloadButton" title="Download as Markdown">
+                            📥
+                        </button>
+                        <button class="action-button" id="copyButton" title="Copy to Clipboard">
+                            📋
+                        </button>
+                        <button class="action-button" id="settingsButton" title="Reader Settings">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="reader-content">
+            <!-- Loading State -->
+            <div class="loading-state" id="loadingState">
+                <div class="spinner large"></div>
+                <p>Loading article...</p>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state" id="errorState" style="display: none;">
+                <div class="error-icon">⚠️</div>
+                <h2>Article Could Not Be Loaded</h2>
+                <p id="errorMessage">There was an error loading the article content.</p>
+                <div class="error-actions">
+                    <button class="primary-button" id="retryButton">Try Again</button>
+                    <button class="secondary-button" id="closeButton">Close Tab</button>
+                </div>
+            </div>
+
+            <!-- Article Content -->
+            <article class="article-content" id="articleContent" style="display: none;">
+                <div class="content-wrapper">
+                    <div class="article-body" id="articleBody">
+                        <!-- Article content will be inserted here -->
+                    </div>
+                </div>
+            </article>
+        </main>
+
+        <!-- Footer -->
+        <footer class="reader-footer">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-text">Powered by Universal Scraper</span>
+                </div>
+                <div class="footer-right">
+                    <button class="footer-button" id="fullscreenButton" title="Toggle Fullscreen">
+                        ⛶
+                    </button>
+                </div>
+            </div>
+        </footer>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Reader Settings</h3>
+                    <button class="modal-close" id="closeSettingsButton">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label for="fontSize">Font Size</label>
+                        <select id="fontSize">
+                            <option value="small">Small</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="large">Large</option>
+                            <option value="xlarge">Extra Large</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="lineHeight">Line Height</label>
+                        <select id="lineHeight">
+                            <option value="tight">Tight</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="relaxed">Relaxed</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="theme">Theme</label>
+                        <select id="theme">
+                            <option value="light" selected>Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="sepia">Sepia</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="width">Content Width</label>
+                        <select id="width">
+                            <option value="narrow">Narrow</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="wide">Wide</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="secondary-button" id="resetSettingsButton">Reset to Defaults</button>
+                    <button class="primary-button" id="saveSettingsButton">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="reader.js"></script>
+</body>
+</html> 

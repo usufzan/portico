@@ -1,0 +1,512 @@
+// Universal Web Scraper Extension - Popup Logic
+
+class UniversalScraperPopup {
+    constructor() {
+        this.currentUrl = null;
+        this.currentTier = null;
+        this.whitelist = [];
+        this.blacklist = [];
+        //  this.apiBaseUrl = 'https://your-app.onrender.com'; // Replace with your actual URL
+        this.apiBaseUrl = 'http://127.0.0.1:8000'; // Point to local backend
+        
+        this.initializeElements();
+        this.bindEvents();
+        this.initialize();
+    }
+
+    // DOM Elements
+    initializeElements() {
+        // Status elements
+        this.statusDot = document.getElementById('statusDot');
+        this.statusText = document.getElementById('statusText');
+        this.apiStatus = document.getElementById('apiStatus');
+
+        // Tier containers
+        this.goldTier = document.getElementById('goldTier');
+        this.silverTier = document.getElementById('silverTier');
+        this.bronzeTier = document.getElementById('bronzeTier');
+        this.loadingState = document.getElementById('loadingState');
+
+        // Progress elements
+        this.progressContainer = document.getElementById('progressContainer');
+        this.progressText = document.getElementById('progressText');
+        this.progressFill = document.getElementById('progressFill');
+        this.progressStages = document.getElementById('progressStages');
+
+        // Results elements
+        this.resultsSummary = document.getElementById('resultsSummary');
+        this.wordCount = document.getElementById('wordCount');
+        this.readingTime = document.getElementById('readingTime');
+
+        // Error elements
+        this.errorState = document.getElementById('errorState');
+        this.errorTitle = document.getElementById('errorTitle');
+        this.errorMessage = document.getElementById('errorMessage');
+
+        // Buttons
+        this.adaptButton = document.getElementById('adaptButton');
+        this.adaptButtonSilver = document.getElementById('adaptButtonSilver');
+        this.requestSupportButton = document.getElementById('requestSupportButton');
+        this.openReaderButton = document.getElementById('openReaderButton');
+        this.downloadButton = document.getElementById('downloadButton');
+        this.copyButton = document.getElementById('copyButton');
+        this.retryButton = document.getElementById('retryButton');
+        this.reportButton = document.getElementById('reportButton');
+
+        // Data storage
+        this.currentArticleData = document.getElementById('currentArticleData');
+        this.currentUrlElement = document.getElementById('currentUrl');
+    }
+
+    // Event Binding
+    bindEvents() {
+        this.adaptButton.addEventListener('click', () => this.startScraping());
+        this.adaptButtonSilver.addEventListener('click', () => this.startScraping());
+        this.requestSupportButton.addEventListener('click', () => this.requestSiteSupport());
+        this.openReaderButton.addEventListener('click', () => this.openReader());
+        this.downloadButton.addEventListener('click', () => this.downloadArticle());
+        this.copyButton.addEventListener('click', () => this.copyArticle());
+        this.retryButton.addEventListener('click', () => this.retryScraping());
+        this.reportButton.addEventListener('click', () => this.reportIssue());
+    }
+
+    // Initialization
+    async initialize() {
+        try {
+            await this.loadCurrentTab();
+            await this.loadWhitelistAndBlacklist();
+            await this.detectTier();
+            this.updateStatus('ready');
+        } catch (error) {
+            console.error('Initialization error:', error);
+            this.showError('Failed to initialize extension', error.message);
+        }
+    }
+
+    // Load current tab information
+    async loadCurrentTab() {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            this.currentUrl = tab.url;
+            this.currentUrlElement.textContent = this.currentUrl;
+            
+            // Send message to content script to analyze the page
+            const response = await chrome.tabs.sendMessage(tab.id, { action: 'analyzePage' });
+            this.pageAnalysis = response;
+        } catch (error) {
+            console.error('Error loading current tab:', error);
+            throw error;
+        }
+    }
+
+    // Load whitelist and blacklist
+    async loadWhitelistAndBlacklist() {
+        try {
+            // Try to load from cache first
+            const cached = await chrome.storage.local.get(['whitelist', 'blacklist']);
+            
+            if (cached.whitelist && cached.blacklist) {
+                this.whitelist = cached.whitelist;
+                this.blacklist = cached.blacklist;
+            }
+
+            // Fetch fresh data from server
+            const [whitelistResponse, blacklistResponse] = await Promise.all([
+                fetch(`${this.apiBaseUrl}/v1/whitelist`),
+                fetch(`${this.apiBaseUrl}/v1/blacklist`)
+            ]);
+
+            if (whitelistResponse.ok) {
+                const whitelistData = await whitelistResponse.json();
+                this.whitelist = whitelistData.whitelist;
+            }
+
+            if (blacklistResponse.ok) {
+                const blacklistData = await blacklistResponse.json();
+                this.blacklist = blacklistData.blacklist;
+            }
+
+            // Cache the data
+            await chrome.storage.local.set({
+                whitelist: this.whitelist,
+                blacklist: this.blacklist
+            });
+
+        } catch (error) {
+            console.error('Error loading lists:', error);
+            // Continue with cached data if available
+        }
+    }
+
+    // Detect tier based on current URL and page analysis
+    async detectTier() {
+        if (!this.currentUrl) {
+            this.showBronzeTier();
+            return;
+        }
+
+        const domain = new URL(this.currentUrl).hostname.replace('www.', '');
+
+        // Check blacklist first
+        if (this.blacklist.includes(domain)) {
+            this.showBronzeTier();
+            return;
+        }
+
+        // Check whitelist
+        if (this.whitelist.includes(domain)) {
+            this.showGoldTier();
+            return;
+        }
+
+        // Smart detection for silver tier
+        if (this.pageAnalysis && this.pageAnalysis.score >= 5) {
+            this.showSilverTier();
+            return;
+        }
+
+        // Default to bronze
+        this.showBronzeTier();
+    }
+
+    // Show different tiers
+    showGoldTier() {
+        this.hideAllTiers();
+        this.goldTier.style.display = 'block';
+        this.currentTier = 'gold';
+        this.updateStatus('premium');
+    }
+
+    showSilverTier() {
+        this.hideAllTiers();
+        this.silverTier.style.display = 'block';
+        this.currentTier = 'silver';
+        this.updateStatus('detected');
+    }
+
+    showBronzeTier() {
+        this.hideAllTiers();
+        this.bronzeTier.style.display = 'block';
+        this.currentTier = 'bronze';
+        this.updateStatus('unsupported');
+    }
+
+    hideAllTiers() {
+        this.goldTier.style.display = 'none';
+        this.silverTier.style.display = 'none';
+        this.bronzeTier.style.display = 'none';
+        this.loadingState.style.display = 'none';
+        this.progressContainer.style.display = 'none';
+        this.resultsSummary.style.display = 'none';
+        this.errorState.style.display = 'none';
+    }
+
+    // Update status indicator
+    updateStatus(status) {
+        this.statusDot.className = 'status-dot';
+        
+        switch (status) {
+            case 'ready':
+                this.statusText.textContent = 'Ready';
+                this.statusDot.style.background = '#4ade80';
+                break;
+            case 'premium':
+                this.statusText.textContent = 'Premium Support';
+                this.statusDot.style.background = '#f59e0b';
+                break;
+            case 'detected':
+                this.statusText.textContent = 'Smart Detection';
+                this.statusDot.style.background = '#6b7280';
+                break;
+            case 'unsupported':
+                this.statusText.textContent = 'Not Supported';
+                this.statusDot.style.background = '#ef4444';
+                break;
+            case 'loading':
+                this.statusText.textContent = 'Processing...';
+                this.statusDot.classList.add('loading');
+                break;
+            case 'error':
+                this.statusText.textContent = 'Error';
+                this.statusDot.classList.add('error');
+                break;
+        }
+    }
+
+    // Start scraping process
+    async startScraping() {
+        try {
+            this.hideAllTiers();
+            this.progressContainer.style.display = 'block';
+            this.updateStatus('loading');
+            
+            // Show loading state on button
+            const button = this.currentTier === 'gold' ? this.adaptButton : this.adaptButtonSilver;
+            const loading = button.querySelector('.button-loading');
+            loading.style.display = 'block';
+            button.disabled = true;
+
+            // Start SSE connection
+            await this.startSSEConnection();
+
+        } catch (error) {
+            console.error('Scraping error:', error);
+            this.showError('Failed to start scraping', error.message);
+        }
+    }
+
+    // Start Server-Sent Events connection
+    async startSSEConnection() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/scrape-stream`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await this.getAuthToken()}`
+                },
+                body: JSON.stringify({ url: this.currentUrl })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = JSON.parse(line.slice(6));
+                        this.handleSSEEvent(data);
+                    }
+                }
+            }
+
+        } catch (error) {
+            console.error('SSE connection error:', error);
+            this.showError('Connection failed', error.message);
+        }
+    }
+
+    // Handle SSE events
+    handleSSEEvent(data) {
+        switch (data.status) {
+            case 'progress':
+                this.updateProgress(data);
+                break;
+            case 'complete':
+                this.handleSuccess(data);
+                break;
+            case 'error':
+                this.handleError(data);
+                break;
+        }
+    }
+
+    // Update progress display
+    updateProgress(data) {
+        const progress = (data.current_stage / data.total_stages) * 100;
+        this.progressFill.style.width = `${progress}%`;
+        this.progressText.textContent = data.message;
+
+        // Update stages
+        this.updateStages(data.current_stage, data.total_stages, data.stage);
+    }
+
+    // Update progress stages
+    updateStages(currentStage, totalStages, currentStageName) {
+        const stages = [
+            'Initialization',
+            'Fast Path',
+            'Browser Setup',
+            'Navigation',
+            'Content Extraction',
+            'Processing'
+        ];
+
+        this.progressStages.innerHTML = '';
+        
+        stages.forEach((stage, index) => {
+            const stageElement = document.createElement('div');
+            stageElement.className = 'stage-item';
+            
+            if (index + 1 < currentStage) {
+                stageElement.classList.add('completed');
+                stageElement.innerHTML = `✅ ${stage}`;
+            } else if (index + 1 === currentStage) {
+                stageElement.classList.add('current');
+                stageElement.innerHTML = `🔄 ${stage}`;
+            } else {
+                stageElement.classList.add('pending');
+                stageElement.innerHTML = `⏳ ${stage}`;
+            }
+            
+            this.progressStages.appendChild(stageElement);
+        });
+    }
+
+    // Handle successful scraping
+    handleSuccess(data) {
+        this.hideAllTiers();
+        this.resultsSummary.style.display = 'block';
+        
+        // Store article data
+        this.currentArticleData.textContent = JSON.stringify(data.data);
+        
+        // Update metadata
+        const metadata = data.data.metadata;
+        this.wordCount.textContent = `${metadata.word_count} words`;
+        this.readingTime.textContent = `${metadata.reading_time_minutes.toFixed(1)} min read`;
+        
+        this.updateStatus('ready');
+    }
+
+    // Handle scraping error
+    handleError(data) {
+        this.hideAllTiers();
+        this.errorState.style.display = 'block';
+        
+        this.errorTitle.textContent = 'Adaptation Failed';
+        this.errorMessage.textContent = data.error || 'An unexpected error occurred';
+        
+        this.updateStatus('error');
+    }
+
+    // Show error state
+    showError(title, message) {
+        this.hideAllTiers();
+        this.errorState.style.display = 'block';
+        
+        this.errorTitle.textContent = title;
+        this.errorMessage.textContent = message;
+        
+        this.updateStatus('error');
+    }
+
+    // Open reader tab
+    async openReader() {
+        try {
+            const articleData = JSON.parse(this.currentArticleData.textContent);
+            
+            // Store article data for reader
+            await chrome.storage.local.set({ currentArticle: articleData });
+            
+            // Open reader tab
+            await chrome.tabs.create({
+                url: chrome.runtime.getURL('reader.html')
+            });
+            
+            // Close popup
+            window.close();
+            
+        } catch (error) {
+            console.error('Error opening reader:', error);
+            this.showError('Failed to open reader', error.message);
+        }
+    }
+
+    // Download article as markdown
+    async downloadArticle() {
+        try {
+            const articleData = JSON.parse(this.currentArticleData.textContent);
+            const markdown = articleData.content.markdown;
+            
+            const blob = new Blob([markdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${articleData.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+        } catch (error) {
+            console.error('Error downloading article:', error);
+            this.showError('Failed to download', error.message);
+        }
+    }
+
+    // Copy article to clipboard
+    async copyArticle() {
+        try {
+            const articleData = JSON.parse(this.currentArticleData.textContent);
+            const markdown = articleData.content.markdown;
+            
+            await navigator.clipboard.writeText(markdown);
+            
+            // Show success feedback
+            const button = this.copyButton;
+            const originalText = button.textContent;
+            button.textContent = '✅ Copied!';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error copying article:', error);
+            this.showError('Failed to copy', error.message);
+        }
+    }
+
+    // Request site support
+    async requestSiteSupport() {
+        try {
+            const domain = new URL(this.currentUrl).hostname.replace('www.', '');
+            
+            const response = await fetch(`${this.apiBaseUrl}/v1/requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await this.getAuthToken()}`
+                },
+                body: JSON.stringify({ requested_domain: domain })
+            });
+
+            if (response.ok) {
+                // Show success feedback
+                this.requestSupportButton.textContent = '✅ Requested!';
+                setTimeout(() => {
+                    this.requestSupportButton.textContent = 'Request Site Support';
+                }, 3000);
+            } else {
+                throw new Error('Failed to submit request');
+            }
+            
+        } catch (error) {
+            console.error('Error requesting site support:', error);
+            this.showError('Failed to submit request', error.message);
+        }
+    }
+
+    // Retry scraping
+    retryScraping() {
+        this.startScraping();
+    }
+
+    // Report issue
+    reportIssue() {
+        // Open options page for issue reporting
+        chrome.runtime.openOptionsPage();
+    }
+
+    // Get authentication token
+    async getAuthToken() {
+        // For MVP, return a simple token
+        // In production, this would get the JWT from Supabase
+        return 'demo_token_' + Date.now();
+    }
+}
+
+// Initialize popup when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new UniversalScraperPopup();
+}); 

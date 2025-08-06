@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Universal Scraper Options</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>Extension Settings</h1>
+
+        <div class="setting-group">
+            <label for="theme">Theme</label>
+            <select id="theme">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label for="downloadFormat">Download Format</label>
+            <select id="downloadFormat">
+                <option value="markdown">Markdown (.md)</option>
+                <option value="text">Plain Text (.txt)</option>
+            </select>
+        </div>
+
+        <div class="setting-group">
+            <label for="autoDetect">Auto-detect Article Pages</label>
+            <input type="checkbox" id="autoDetect">
+            <span class="description">Automatically update the extension icon for supported pages.</span>
+        </div>
+        
+        <div class="setting-group">
+            <label for="historyLimit">History Limit</label>
+            <input type="number" id="historyLimit" min="1" max="100">
+            <span class="description">Number of articles to keep in history.</span>
+        </div>
+
+        <div class="setting-group">
+            <label for="analyticsEnabled">Enable Anonymous Analytics</label>
+            <input type="checkbox" id="analyticsEnabled">
+            <span class="description">Help improve the extension by sending anonymous usage data.</span>
+        </div>
+        
+        <div class="button-container">
+            <button id="save">Save Settings</button>
+            <div id="status"></div>
+        </div>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html>
