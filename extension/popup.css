@@ -67,6 +67,108 @@ body {
     50% { opacity: 0.5; }
 }
 
+/* Authentication Section */
+.auth-section {
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 12px;
+    background: white;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.auth-tab.active {
+    background: #667eea;
+    color: white;
+}
+
+.auth-tab:hover:not(.active) {
+    background: #f3f4f6;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.form-group input,
+.form-group select {
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.auth-error {
+    color: #ef4444;
+    font-size: 12px;
+    text-align: center;
+    min-height: 16px;
+}
+
+/* Preferences Section */
+.preferences-section {
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+.preferences-section h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #374151;
+}
+
+.preferences-description {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.preferences-error {
+    color: #ef4444;
+    font-size: 12px;
+    text-align: center;
+    min-height: 16px;
+}
+
 /* Main Content */
 .main-content {
     padding: 20px;

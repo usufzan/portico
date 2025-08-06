@@ -24,6 +24,32 @@ CREATE TABLE users (
 """)
 print("- 'users' table created.")
 
+# --- Create user_preferences table ---
+cursor.execute("""
+CREATE TABLE user_preferences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE, -- Ensures one-to-one relationship
+    base_language TEXT NOT NULL DEFAULT 'en',
+    target_language TEXT NOT NULL,
+    proficiency_level TEXT NOT NULL, -- Storing as TEXT for flexibility (e.g., 'A1', 'A2', 'B1')
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+""")
+print("- 'user_preferences' table created.")
+
+# --- Create a trigger for user_preferences updated_at ---
+cursor.execute("""
+CREATE TRIGGER update_user_preferences_updated_at
+AFTER UPDATE ON user_preferences
+FOR EACH ROW
+BEGIN
+    UPDATE user_preferences SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+END;
+""")
+print("- Trigger for 'user_preferences' created.")
+
 # --- Create scraped_articles table ---
 cursor.execute("""
 CREATE TABLE scraped_articles (

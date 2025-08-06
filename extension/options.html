@@ -8,45 +8,61 @@
 <body>
 
     <div class="container">
-        <h1>Extension Settings</h1>
+        <h1>Language Preferences</h1>
 
-        <div class="setting-group">
-            <label for="theme">Theme</label>
-            <select id="theme">
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
-        </div>
-
-        <div class="setting-group">
-            <label for="downloadFormat">Download Format</label>
-            <select id="downloadFormat">
-                <option value="markdown">Markdown (.md)</option>
-                <option value="text">Plain Text (.txt)</option>
-            </select>
+        <!-- Authentication Status -->
+        <div class="auth-status" id="authStatus">
+            <div class="status-indicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Checking authentication...</span>
+            </div>
+            <button class="auth-button" id="authButton" style="display: none;">Login</button>
         </div>
 
-        <div class="setting-group">
-            <label for="autoDetect">Auto-detect Article Pages</label>
-            <input type="checkbox" id="autoDetect">
-            <span class="description">Automatically update the extension icon for supported pages.</span>
-        </div>
-        
-        <div class="setting-group">
-            <label for="historyLimit">History Limit</label>
-            <input type="number" id="historyLimit" min="1" max="100">
-            <span class="description">Number of articles to keep in history.</span>
-        </div>
+        <!-- User Preferences Section -->
+        <div class="section" id="preferencesSection" style="display: none;">
+            <h2>Language Preferences</h2>
+            <p class="section-description">Customize how articles are adapted for your learning needs.</p>
+            
+            <div class="setting-group">
+                <label for="baseLanguage">Base Language</label>
+                <select id="baseLanguage">
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="it">Italian</option>
+                </select>
+            </div>
 
-        <div class="setting-group">
-            <label for="analyticsEnabled">Enable Anonymous Analytics</label>
-            <input type="checkbox" id="analyticsEnabled">
-            <span class="description">Help improve the extension by sending anonymous usage data.</span>
-        </div>
-        
-        <div class="button-container">
-            <button id="save">Save Settings</button>
-            <div id="status"></div>
+            <div class="setting-group">
+                <label for="targetLanguage">Target Language</label>
+                <select id="targetLanguage">
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="it">Italian</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label for="proficiencyLevel">Proficiency Level</label>
+                <select id="proficiencyLevel">
+                    <option value="A1">Beginner (A1)</option>
+                    <option value="A2">Elementary (A2)</option>
+                    <option value="B1">Intermediate (B1)</option>
+                    <option value="B2">Upper Intermediate (B2)</option>
+                    <option value="C1">Advanced (C1)</option>
+                    <option value="C2">Proficient (C2)</option>
+                </select>
+            </div>
+
+            <div class="button-container">
+                <button id="savePreferencesButton" class="primary-button">Save Preferences</button>
+                <div id="status"></div>
+            </div>
+            <div class="preferences-error" id="preferencesError"></div>
         </div>
     </div>
 

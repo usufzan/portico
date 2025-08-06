@@ -17,8 +17,87 @@
             </div>
         </div>
 
+        <!-- Authentication Section -->
+        <div class="auth-section" id="authSection" style="display: none;">
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="loginTab">Login</button>
+                <button class="auth-tab" id="registerTab">Register</button>
+            </div>
+            
+            <!-- Login Form -->
+            <div class="auth-form" id="loginForm">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password">
+                </div>
+                <button class="primary-button" id="loginButton">Login</button>
+                <div class="auth-error" id="loginError"></div>
+            </div>
+            
+            <!-- Register Form -->
+            <div class="auth-form" id="registerForm" style="display: none;">
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" placeholder="Enter your email">
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" placeholder="Enter your password">
+                </div>
+                <button class="primary-button" id="registerButton">Register</button>
+                <div class="auth-error" id="registerError"></div>
+            </div>
+        </div>
+
+        <!-- User Preferences Section -->
+        <div class="preferences-section" id="preferencesSection" style="display: none;">
+            <h3>Language Preferences</h3>
+            <p class="preferences-description">Set your language preferences to customize article adaptation.</p>
+            
+            <div class="form-group">
+                <label for="baseLanguage">Base Language</label>
+                <select id="baseLanguage">
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="it">Italian</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="targetLanguage">Target Language</label>
+                <select id="targetLanguage">
+                    <option value="en">English</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="it">Italian</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="proficiencyLevel">Proficiency Level</label>
+                <select id="proficiencyLevel">
+                    <option value="A1">Beginner (A1)</option>
+                    <option value="A2">Elementary (A2)</option>
+                    <option value="B1">Intermediate (B1)</option>
+                    <option value="B2">Upper Intermediate (B2)</option>
+                    <option value="C1">Advanced (C1)</option>
+                    <option value="C2">Proficient (C2)</option>
+                </select>
+            </div>
+            
+            <button class="primary-button" id="savePreferencesButton">Save Preferences</button>
+            <div class="preferences-error" id="preferencesError"></div>
+        </div>
+
         <!-- Main Content -->
-        <div class="main-content">
+        <div class="main-content" id="mainContent" style="display: none;">
             <!-- Tier 1: Gold Tier (Whitelisted) -->
             <div class="tier gold-tier" id="goldTier" style="display: none;">
                 <div class="tier-header">
@@ -120,6 +199,7 @@
             <div class="footer-links">
                 <a href="#" id="historyLink">History</a>
                 <a href="#" id="settingsLink">Settings</a>
+                <a href="#" id="logoutLink">Logout</a>
             </div>
             <div class="footer-status">
                 <span class="api-status" id="apiStatus">API: Connected</span>

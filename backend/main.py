@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPBearer
 from pydantic import BaseModel, HttpUrl
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -35,6 +36,9 @@ RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 # Password Hashing Context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# JWT Bearer token scheme
+security = HTTPBearer()
+
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
@@ -49,7 +53,10 @@ logger = logging.getLogger(__name__)
 class UserCreate(BaseModel):
     email: str
     password: str
-
+class UserPreferences(BaseModel):
+    base_language: str
+    target_language: str
+    proficiency_level: str
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -118,14 +125,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(request: Request, token: str = Depends(jwt.decode)):
+async def get_current_user(request: Request, token: str = Depends(security)):
     credentials_exception = HTTPException(
         status_code=401,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
@@ -295,17 +302,33 @@ async def scrape_stream(
             detail=f"Rate limit exceeded. Maximum {RATE_LIMIT_PER_MINUTE} requests per minute."
         )
 
-    # Log the request
-    logger.info(f"Scraping request for {scrape_req.url} from user {user_id_str}")
+    # Fetch user preferences
+    db = request.app.state.db
+    cursor = db.cursor()
+    user_prefs = cursor.execute(
+        "SELECT target_language, proficiency_level FROM user_preferences WHERE user_id = ?",
+        (current_user['id'],)
+    ).fetchone()
+
+    if not user_prefs:
+        raise HTTPException(status_code=400, detail="User preferences not set. Please set them before scraping.")
+
+    logger.info(
+        f"Scraping request for {scrape_req.url} from user {current_user['id']}. "
+        f"Target Language: {user_prefs['target_language']}, Level: {user_prefs['proficiency_level']}"
+    )
 
     # The generator needs to be adapted to save data
     async def sse_and_save_generator():
         final_data = None
-        async for update in generate_sse_events(str(scrape_req.url), user_id_str):
+        # FUTURE: You would pass user_prefs to the scraper here
+        # e.g., generate_sse_events(str(scrape_req.url), user_prefs)
+        async for update in generate_sse_events(str(scrape_req.url), user_id=user_id_str):
             yield update
             # Snag the final data packet to save it
-            if update.status == 'complete' and update.data:
-                final_data = update.data
+            if 'complete' in update and 'data:' in update:
+                final_data_str = update.split('data: ')[1]
+                final_data = json.loads(final_data_str)
 
         # After the stream is finished, save to DB if it was successful
         if final_data and current_user:
@@ -367,6 +390,49 @@ async def request_site_support(
     except Exception as e:
         logger.exception(f"Error logging site support request: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/api/v1/preferences", response_model=UserPreferences)
+async def get_user_preferences(request: Request, current_user: sqlite3.Row = Depends(get_current_user)):
+    """
+    Retrieve the current user's language preferences.
+    """
+    db = request.app.state.db
+    cursor = db.cursor()
+    prefs = cursor.execute(
+        "SELECT base_language, target_language, proficiency_level FROM user_preferences WHERE user_id = ?",
+        (current_user['id'],)
+    ).fetchone()
+
+    if not prefs:
+        raise HTTPException(status_code=404, detail="Preferences not found for this user.")
+
+    return prefs
+
+@app.put("/api/v1/preferences", status_code=200)
+async def update_user_preferences(
+    preferences: UserPreferences,
+    request: Request,
+    current_user: sqlite3.Row = Depends(get_current_user)
+):
+    """
+    Create or update the current user's language preferences.
+    """
+    db = request.app.state.db
+    cursor = db.cursor()
+
+    # This is an "UPSERT" operation
+    cursor.execute("""
+        INSERT INTO user_preferences (user_id, base_language, target_language, proficiency_level)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            base_language = excluded.base_language,
+            target_language = excluded.target_language,
+            proficiency_level = excluded.proficiency_level,
+            updated_at = CURRENT_TIMESTAMP
+    """, (current_user['id'], preferences.base_language, preferences.target_language, preferences.proficiency_level))
+
+    db.commit()
+    return {"message": "Preferences updated successfully"}
 
 @app.get("/v1/whitelist")
 async def get_whitelist():

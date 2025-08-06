@@ -160,6 +160,12 @@ class BackgroundServiceWorker {
                     sendResponse({ success: true, data: status });
                     break;
 
+                case 'openPopup':
+                    // Open the popup for authentication
+                    chrome.action.openPopup();
+                    sendResponse({ success: true });
+                    break;
+
                 default:
                     sendResponse({ success: false, error: 'Unknown action' });
             }

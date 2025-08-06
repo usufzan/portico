@@ -6,6 +6,8 @@ class UniversalScraperPopup {
         this.currentTier = null;
         this.whitelist = [];
         this.blacklist = [];
+        this.authToken = null;
+        this.userPreferences = null;
         //  this.apiBaseUrl = 'https://your-app.onrender.com'; // Replace with your actual URL
         this.apiBaseUrl = 'http://127.0.0.1:8000'; // Point to local backend
         
@@ -16,6 +18,32 @@ class UniversalScraperPopup {
 
     // DOM Elements
     initializeElements() {
+        // Authentication elements
+        this.authSection = document.getElementById('authSection');
+        this.loginTab = document.getElementById('loginTab');
+        this.registerTab = document.getElementById('registerTab');
+        this.loginForm = document.getElementById('loginForm');
+        this.registerForm = document.getElementById('registerForm');
+        this.loginEmail = document.getElementById('loginEmail');
+        this.loginPassword = document.getElementById('loginPassword');
+        this.registerEmail = document.getElementById('registerEmail');
+        this.registerPassword = document.getElementById('registerPassword');
+        this.loginButton = document.getElementById('loginButton');
+        this.registerButton = document.getElementById('registerButton');
+        this.loginError = document.getElementById('loginError');
+        this.registerError = document.getElementById('registerError');
+
+        // Preferences elements
+        this.preferencesSection = document.getElementById('preferencesSection');
+        this.baseLanguage = document.getElementById('baseLanguage');
+        this.targetLanguage = document.getElementById('targetLanguage');
+        this.proficiencyLevel = document.getElementById('proficiencyLevel');
+        this.savePreferencesButton = document.getElementById('savePreferencesButton');
+        this.preferencesError = document.getElementById('preferencesError');
+
+        // Main content elements
+        this.mainContent = document.getElementById('mainContent');
+
         // Status elements
         this.statusDot = document.getElementById('statusDot');
         this.statusText = document.getElementById('statusText');
@@ -60,6 +88,16 @@ class UniversalScraperPopup {
 
     // Event Binding
     bindEvents() {
+        // Authentication events
+        this.loginTab.addEventListener('click', () => this.switchToLogin());
+        this.registerTab.addEventListener('click', () => this.switchToRegister());
+        this.loginButton.addEventListener('click', () => this.handleLogin());
+        this.registerButton.addEventListener('click', () => this.handleRegister());
+
+        // Preferences events
+        this.savePreferencesButton.addEventListener('click', () => this.saveUserPreferences());
+
+        // Main functionality events
         this.adaptButton.addEventListener('click', () => this.startScraping());
         this.adaptButtonSilver.addEventListener('click', () => this.startScraping());
         this.requestSupportButton.addEventListener('click', () => this.requestSiteSupport());
@@ -68,15 +106,27 @@ class UniversalScraperPopup {
         this.copyButton.addEventListener('click', () => this.copyArticle());
         this.retryButton.addEventListener('click', () => this.retryScraping());
         this.reportButton.addEventListener('click', () => this.reportIssue());
+
+        // Footer events
+        document.getElementById('historyLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            chrome.runtime.openOptionsPage();
+        });
+        document.getElementById('settingsLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            chrome.runtime.openOptionsPage();
+        });
+        document.getElementById('logoutLink').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.handleLogout();
+        });
     }
 
     // Initialization
     async initialize() {
         try {
             await this.loadCurrentTab();
-            await this.loadWhitelistAndBlacklist();
-            await this.detectTier();
-            this.updateStatus('ready');
+            await this.checkAuthentication();
         } catch (error) {
             console.error('Initialization error:', error);
             this.showError('Failed to initialize extension', error.message);
@@ -229,6 +279,14 @@ class UniversalScraperPopup {
             case 'error':
                 this.statusText.textContent = 'Error';
                 this.statusDot.classList.add('error');
+                break;
+            case 'unauthenticated':
+                this.statusText.textContent = 'Not Authenticated';
+                this.statusDot.style.background = '#f59e0b';
+                break;
+            case 'setup_required':
+                this.statusText.textContent = 'Setup Required';
+                this.statusDot.style.background = '#6b7280';
                 break;
         }
     }
@@ -498,11 +556,281 @@ class UniversalScraperPopup {
         chrome.runtime.openOptionsPage();
     }
 
-    // Get authentication token
+    // Authentication Methods
+    async checkAuthentication() {
+        try {
+            // Check if we have a stored token
+            const storedToken = await this.getStoredAuthToken();
+            if (storedToken) {
+                // Verify token is still valid
+                const isValid = await this.verifyToken(storedToken);
+                if (isValid) {
+                    this.authToken = storedToken;
+                    await this.loadUserPreferences();
+                    this.showMainContent();
+                } else {
+                    this.showAuthentication();
+                }
+            } else {
+                this.showAuthentication();
+            }
+        } catch (error) {
+            console.error('Authentication check error:', error);
+            this.showAuthentication();
+        }
+    }
+
+    showAuthentication() {
+        this.authSection.style.display = 'block';
+        this.preferencesSection.style.display = 'none';
+        this.mainContent.style.display = 'none';
+        this.updateStatus('unauthenticated');
+    }
+
+    async showMainContent() {
+        this.authSection.style.display = 'none';
+        this.preferencesSection.style.display = 'none';
+        this.mainContent.style.display = 'block';
+        
+        await this.loadWhitelistAndBlacklist();
+        await this.detectTier();
+        this.updateStatus('ready');
+    }
+
+    switchToLogin() {
+        this.loginTab.classList.add('active');
+        this.registerTab.classList.remove('active');
+        this.loginForm.style.display = 'flex';
+        this.registerForm.style.display = 'none';
+        this.loginError.textContent = '';
+        this.registerError.textContent = '';
+    }
+
+    switchToRegister() {
+        this.registerTab.classList.add('active');
+        this.loginTab.classList.remove('active');
+        this.registerForm.style.display = 'flex';
+        this.loginForm.style.display = 'none';
+        this.loginError.textContent = '';
+        this.registerError.textContent = '';
+    }
+
+    async handleLogin() {
+        try {
+            this.loginButton.disabled = true;
+            this.loginButton.textContent = 'Logging in...';
+            this.loginError.textContent = '';
+
+            const email = this.loginEmail.value.trim();
+            const password = this.loginPassword.value;
+
+            if (!email || !password) {
+                throw new Error('Please fill in all fields');
+            }
+
+            const response = await fetch(`${this.apiBaseUrl}/token`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Login failed');
+            }
+
+            const data = await response.json();
+            this.authToken = data.access_token;
+            await this.storeAuthToken(this.authToken);
+            
+            await this.loadUserPreferences();
+            this.showMainContent();
+
+        } catch (error) {
+            console.error('Login error:', error);
+            this.loginError.textContent = error.message;
+        } finally {
+            this.loginButton.disabled = false;
+            this.loginButton.textContent = 'Login';
+        }
+    }
+
+    async handleRegister() {
+        try {
+            this.registerButton.disabled = true;
+            this.registerButton.textContent = 'Registering...';
+            this.registerError.textContent = '';
+
+            const email = this.registerEmail.value.trim();
+            const password = this.registerPassword.value;
+
+            if (!email || !password) {
+                throw new Error('Please fill in all fields');
+            }
+
+            if (password.length < 6) {
+                throw new Error('Password must be at least 6 characters');
+            }
+
+            const response = await fetch(`${this.apiBaseUrl}/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Registration failed');
+            }
+
+            // Auto-login after successful registration
+            await this.handleLogin();
+
+        } catch (error) {
+            console.error('Registration error:', error);
+            this.registerError.textContent = error.message;
+        } finally {
+            this.registerButton.disabled = false;
+            this.registerButton.textContent = 'Register';
+        }
+    }
+
+    // User Preferences Methods
+    async loadUserPreferences() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/v1/preferences`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                this.userPreferences = await response.json();
+                this.populatePreferencesForm();
+            } else if (response.status === 404) {
+                // User doesn't have preferences set yet
+                this.showPreferencesSetup();
+            } else {
+                throw new Error('Failed to load preferences');
+            }
+        } catch (error) {
+            console.error('Error loading preferences:', error);
+            this.showPreferencesSetup();
+        }
+    }
+
+    showPreferencesSetup() {
+        this.authSection.style.display = 'none';
+        this.preferencesSection.style.display = 'block';
+        this.mainContent.style.display = 'none';
+        this.updateStatus('setup_required');
+    }
+
+    populatePreferencesForm() {
+        if (this.userPreferences) {
+            this.baseLanguage.value = this.userPreferences.base_language;
+            this.targetLanguage.value = this.userPreferences.target_language;
+            this.proficiencyLevel.value = this.userPreferences.proficiency_level;
+        }
+    }
+
+    async saveUserPreferences() {
+        try {
+            this.savePreferencesButton.disabled = true;
+            this.savePreferencesButton.textContent = 'Saving...';
+            this.preferencesError.textContent = '';
+
+            const preferences = {
+                base_language: this.baseLanguage.value,
+                target_language: this.targetLanguage.value,
+                proficiency_level: this.proficiencyLevel.value
+            };
+
+            const response = await fetch(`${this.apiBaseUrl}/api/v1/preferences`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify(preferences)
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save preferences');
+            }
+
+            this.userPreferences = preferences;
+            this.showMainContent();
+
+        } catch (error) {
+            console.error('Error saving preferences:', error);
+            this.preferencesError.textContent = error.message;
+        } finally {
+            this.savePreferencesButton.disabled = false;
+            this.savePreferencesButton.textContent = 'Save Preferences';
+        }
+    }
+
+    // Token Management
+    async getStoredAuthToken() {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['authToken'], (result) => {
+                resolve(result.authToken || null);
+            });
+        });
+    }
+
+    async storeAuthToken(token) {
+        return new Promise((resolve) => {
+            chrome.storage.local.set({ authToken: token }, resolve);
+        });
+    }
+
+    async verifyToken(token) {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/health`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            return response.ok;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    // Updated getAuthToken method
     async getAuthToken() {
-        // For MVP, return a simple token
-        // In production, this would get the JWT from Supabase
-        return 'demo_token_' + Date.now();
+        if (!this.authToken) {
+            throw new Error('Not authenticated');
+        }
+        return this.authToken;
+    }
+
+    // Logout functionality
+    async handleLogout() {
+        try {
+            // Clear stored token
+            await this.clearStoredAuthToken();
+            this.authToken = null;
+            this.userPreferences = null;
+            
+            // Show authentication screen
+            this.showAuthentication();
+            
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+    }
+
+    async clearStoredAuthToken() {
+        return new Promise((resolve) => {
+            chrome.storage.local.remove(['authToken'], resolve);
+        });
     }
 }
 
