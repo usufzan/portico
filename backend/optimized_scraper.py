@@ -16,6 +16,7 @@ from readability import Document
 from markdownify import markdownify as md
 from dateutil.parser import parse as parse_date
 from playwright.async_api import async_playwright, Page, Browser, Playwright, Error as PlaywrightError, Route
+from playwright_stealth import stealth_async
 
 # --- Constants and Data Models ---
 UNKNOWN_AUTHOR = "Unknown"
@@ -341,6 +342,9 @@ class OptimizedUniversalScraper:
             )
             await context.route("**/*", block_requests)
             page = await context.new_page()
+            
+            # Apply stealth settings to the page
+            await stealth_async(page)
             
             # Enhanced anti-detection
             await page.add_init_script("""
