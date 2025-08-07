@@ -348,56 +348,9 @@ async def scrape_stream(
         f"Target Language: {user_prefs['target_language']}, Level: {user_prefs['proficiency_level']}"
     )
 
-    # The generator needs to be adapted to save data
-    async def sse_and_save_generator():
-        final_data = None
-        current_event = None
-        current_data = None
-        
-        # FUTURE: You would pass user_prefs to the scraper here
-        # e.g., generate_sse_events(str(scrape_req.url), user_prefs)
-        async for update in generate_sse_events(str(scrape_req.url), user_id=user_id_str):
-            yield update
-            
-            # Parse SSE events properly
-            if update.startswith('event: '):
-                current_event = update.replace('event: ', '').strip()
-            elif update.startswith('data: '):
-                try:
-                    json_string = update.replace('data: ', '').strip()
-                    current_data = json.loads(json_string)
-                    
-                    # Check if this is a complete event with data
-                    if current_event == 'complete' and current_data and current_data.get('status') == 'complete':
-                        final_data = current_data.get('data')  # Get the nested 'data' object
-                        logger.info(f"Captured final data for database save: {final_data.get('title') if final_data else 'No title'}")
-                except json.JSONDecodeError as e:
-                    logger.error(f"Could not parse JSON data from SSE event: {update}. Error: {e}")
-
-        # After the stream is finished, save to DB if it was successful
-        if final_data and current_user:
-            db = request.app.state.db
-            cursor = db.cursor()
-            article = final_data
-            metadata = article.get('metadata', {})
-            cursor.execute("""
-                INSERT INTO scraped_articles (user_id, original_url, title, author, publication_date, word_count, content_markdown)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                current_user['id'],
-                article.get('url'),
-                article.get('title'),
-                metadata.get('author'),
-                metadata.get('publication_date_utc'),
-                metadata.get('word_count'),
-                article.get('content', {}).get('markdown')
-            ))
-            db.commit()
-            logger.info(f"Saved article '{article.get('title')}' to history for user {current_user['id']}.")
-
-    # Return SSE stream
+    # Return SSE stream directly - data saving is handled by the frontend
     return StreamingResponse(
-        sse_and_save_generator(),
+        generate_sse_events(str(scrape_req.url), user_id=user_id_str),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

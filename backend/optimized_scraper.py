@@ -147,28 +147,13 @@ class OptimizedUniversalScraper:
         self._browser = await self._playwright.chromium.launch(
             headless=True,
             args=[
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--disable-blink-features=AutomationControlled',
-                '--disable-extensions',
-                '--disable-plugins',
-                '--disable-images',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding',
-                '--disable-features=TranslateUI',
-                '--disable-ipc-flooding-protection',
-                '--no-first-run',
-                '--no-default-browser-check',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--disable-translate',
-                '--hide-scrollbars',
-                '--mute-audio',
-                '--no-zygote',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
+                '--no-sandbox',  # Required for Docker/CI environments
+                '--disable-dev-shm-usage',  # Prevents memory issues in containers
+                '--disable-blink-features=AutomationControlled',  # Bypasses bot detection
+                '--disable-extensions',  # Reduces memory usage and potential conflicts
+                '--disable-images',  # Improves performance for text extraction
+                '--no-first-run',  # Skips first-run setup dialogs
+                '--disable-default-apps'  # Prevents default app installation
             ]
         )
         return self
@@ -206,23 +191,23 @@ class OptimizedUniversalScraper:
         if not self.config.get("helper_proxy_enabled", False):
             return None
         
-        # Check if helper proxy rotation is enabled
-        if self.config.get("helper_proxy_rotation", False):
-            helper_proxy = self._get_helper_proxy()
-            if helper_proxy:
-                return helper_proxy
+        # Check if rotation is enabled (either boolean or dict with enabled=True)
+        rotation_config = self.config.get("helper_proxy_rotation", False)
+        if rotation_config:
+            if isinstance(rotation_config, bool):
+                # Use HelperProxyManager
+                return self._get_helper_proxy()
+            elif isinstance(rotation_config, dict) and rotation_config.get("enabled"):
+                # Use custom proxy list
+                proxy_list = rotation_config.get("proxy_list", [])
+                if proxy_list:
+                    current_index = rotation_config.get("current_index", 0)
+                    proxy = proxy_list[current_index % len(proxy_list)]
+                    # Rotate to next proxy
+                    rotation_config["current_index"] = (current_index + 1) % len(proxy_list)
+                    return proxy
         
-        # Check if proxy rotation is enabled
-        if self.config.get("helper_proxy_rotation", {}).get("enabled", False):
-            proxy_list = self.config["helper_proxy_rotation"]["proxy_list"]
-            if proxy_list:
-                current_index = self.config["helper_proxy_rotation"]["current_index"]
-                proxy = proxy_list[current_index % len(proxy_list)]
-                # Rotate to next proxy
-                self.config["helper_proxy_rotation"]["current_index"] = (current_index + 1) % len(proxy_list)
-                return proxy
-        
-        # Use single helper proxy settings
+        # Use single proxy settings
         proxy_settings = self.config.get("helper_proxy_settings", {})
         if proxy_settings.get("server"):
             return {
@@ -243,26 +228,25 @@ class OptimizedUniversalScraper:
         }
         self.logger.info(f"Helper proxy enabled: {server}")
 
-    def enable_helper_proxy_rotation(self, proxy_list: List[Dict[str, str]]):
-        """Enable helper proxy rotation with a list of proxies."""
+    def enable_helper_proxy_rotation(self, proxy_list: Optional[List[Dict[str, str]]] = None):
+        """Enable helper proxy rotation. If proxy_list provided, uses custom list; otherwise uses HelperProxyManager."""
         self.config["helper_proxy_enabled"] = True
-        self.config["helper_proxy_rotation"] = {
-            "enabled": True,
-            "proxy_list": proxy_list,
-            "current_index": 0
-        }
-        self.logger.info(f"Helper proxy rotation enabled with {len(proxy_list)} proxies")
+        
+        if proxy_list:
+            self.config["helper_proxy_rotation"] = {
+                "enabled": True,
+                "proxy_list": proxy_list,
+                "current_index": 0
+            }
+            self.logger.info(f"Helper proxy rotation enabled with {len(proxy_list)} custom proxies")
+        else:
+            self.config["helper_proxy_rotation"] = True
+            self.logger.info("Helper proxy rotation enabled using HelperProxyManager")
 
     def disable_helper_proxy(self):
         """Disable helper proxy usage."""
         self.config["helper_proxy_enabled"] = False
         self.logger.info("Helper proxy disabled")
-
-    def enable_helper_proxy_rotation(self):
-        """Enable helper proxy rotation using the HelperProxyManager."""
-        self.config["helper_proxy_enabled"] = True
-        self.config["helper_proxy_rotation"] = True
-        self.logger.info("Helper proxy rotation enabled")
 
     def _get_helper_proxy(self) -> Optional[Dict[str, str]]:
         """Get a helper proxy from the proxy manager."""

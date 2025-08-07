@@ -6,6 +6,7 @@ class UniversalScraperPopup {
         this.currentTier = null;
         this.whitelist = [];
         this.blacklist = [];
+        this.authManager = new AuthManager();
         this.authToken = null;
         this.userPreferences = null;
         //  this.apiBaseUrl = 'https://your-app.onrender.com'; // Replace with your actual URL
@@ -800,62 +801,38 @@ class UniversalScraperPopup {
         }
     }
 
-    // Token Management
+    // Auth methods now use the shared AuthManager
     async getStoredAuthToken() {
-        return new Promise((resolve) => {
-            chrome.storage.local.get(['authToken'], (result) => {
-                resolve(result.authToken || null);
-            });
-        });
+        return this.authManager.getStoredAuthToken();
     }
 
     async storeAuthToken(token) {
-        return new Promise((resolve) => {
-            chrome.storage.local.set({ authToken: token }, resolve);
-        });
+        return this.authManager.storeAuthToken(token);
     }
 
     async verifyToken(token) {
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/health`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            return response.ok;
-        } catch (error) {
-            return false;
-        }
+        return this.authManager.verifyToken(token);
     }
 
-    // Updated getAuthToken method
     async getAuthToken() {
-        if (!this.authToken) {
-            throw new Error('Not authenticated');
-        }
-        return this.authToken;
+        const result = await this.authManager.checkAuthentication();
+        return result.authenticated ? result.token : null;
     }
 
     // Logout functionality
     async handleLogout() {
         try {
-            // Clear stored token
-            await this.clearStoredAuthToken();
+            await this.authManager.logout();
             this.authToken = null;
             this.userPreferences = null;
-            
-            // Show authentication screen
             this.showAuthentication();
-            
         } catch (error) {
             console.error('Logout error:', error);
         }
     }
 
     async clearStoredAuthToken() {
-        return new Promise((resolve) => {
-            chrome.storage.local.remove(['authToken'], resolve);
-        });
+        return this.authManager.clearStoredAuthToken();
     }
 }
 
