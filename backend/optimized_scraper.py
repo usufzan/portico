@@ -2,6 +2,7 @@
 import json
 import asyncio
 import logging
+import random
 from typing import Dict, Optional, AsyncGenerator, Any, List, Union
 from dataclasses import dataclass, asdict, field
 from datetime import datetime, timezone
@@ -131,7 +132,30 @@ class OptimizedUniversalScraper:
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+            args=[
+                '--no-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-blink-features=AutomationControlled',
+                '--disable-extensions',
+                '--disable-plugins',
+                '--disable-images',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding',
+                '--disable-features=TranslateUI',
+                '--disable-ipc-flooding-protection',
+                '--no-first-run',
+                '--no-default-browser-check',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--hide-scrollbars',
+                '--mute-audio',
+                '--no-zygote',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
+            ]
         )
         return self
 
@@ -301,16 +325,66 @@ class OptimizedUniversalScraper:
             
             context = await self._browser.new_context(
                 user_agent=self.config['user_agent'],
-                viewport={'width': 1920, 'height': 1080}
+                viewport={'width': 1920, 'height': 1080},
+                # Add more realistic headers
+                extra_http_headers={
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Cache-Control': 'max-age=0'
+                }
             )
             await context.route("**/*", block_requests)
             page = await context.new_page()
             
             # Enhanced anti-detection
             await page.add_init_script("""
+                // Hide webdriver property
                 Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                
+                // Mock plugins
                 Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                
+                // Mock languages
                 Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+                
+                // Mock permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission }) :
+                        originalQuery(parameters)
+                );
+                
+                // Mock chrome runtime
+                if (!window.chrome) {
+                    window.chrome = {
+                        runtime: {},
+                        loadTimes: function() {},
+                        csi: function() {},
+                        app: {}
+                    };
+                }
+                
+                // Mock webkit
+                if (!window.webkit) {
+                    window.webkit = {
+                        messageHandlers: {}
+                    };
+                }
+                
+                // Override toString to hide automation
+                const originalFunction = Function.prototype.toString;
+                Function.prototype.toString = function() {
+                    if (this === Function.prototype.toString) return originalFunction.call(this);
+                    if (this === window.navigator.permissions.query) return 'function query() { [native code] }';
+                    return originalFunction.call(this);
+                };
             """)
             
             # Stage 3: Navigation
@@ -368,9 +442,15 @@ class OptimizedUniversalScraper:
                 await context.close()
 
     async def _navigate_and_consent(self, page: Page, url: str):
-        """Enhanced navigation with better cookie consent handling."""
+        """Enhanced navigation with human-like behavior and better cookie consent handling."""
         try:
             await page.goto(url, wait_until='domcontentloaded', timeout=self.config['goto_timeout'])
+
+            # Wait a random amount of time to mimic human behavior
+            await page.wait_for_timeout(random.randint(1500, 3000))
+
+            # Move the mouse to a random position to simulate user presence
+            await page.mouse.move(random.randint(0, 100), random.randint(0, 100))
 
             # Give the page a moment to run initial scripts (e.g., for cookie banners)
             await page.wait_for_timeout(2000)
@@ -381,6 +461,8 @@ class OptimizedUniversalScraper:
                 try:
                     element = page.locator(selector).first
                     if await element.is_visible(timeout=1000):
+                        # Add human-like delay before clicking
+                        await page.wait_for_timeout(random.randint(500, 1500))
                         await element.click(timeout=self.config['cookie_consent_timeout'])
                         self.logger.info(f"Clicked cookie consent button with selector: {selector}")
                         consent_given = True
@@ -393,6 +475,10 @@ class OptimizedUniversalScraper:
             if consent_given:
                 self.logger.info("Waiting for page to settle after giving consent...")
                 await page.wait_for_timeout(3000)
+
+            # Simulate human scrolling behavior
+            await page.mouse.wheel(0, random.randint(100, 300))
+            await page.wait_for_timeout(random.randint(1000, 2000))
 
             # Final wait for the main content to be surely loaded
             await page.wait_for_load_state('networkidle', timeout=10000)
