@@ -321,14 +321,28 @@ async def scrape_stream(
     # The generator needs to be adapted to save data
     async def sse_and_save_generator():
         final_data = None
+        current_event = None
+        current_data = None
+        
         # FUTURE: You would pass user_prefs to the scraper here
         # e.g., generate_sse_events(str(scrape_req.url), user_prefs)
         async for update in generate_sse_events(str(scrape_req.url), user_id=user_id_str):
             yield update
-            # Snag the final data packet to save it
-            if 'complete' in update and 'data:' in update:
-                final_data_str = update.split('data: ')[1]
-                final_data = json.loads(final_data_str)
+            
+            # Parse SSE events properly
+            if update.startswith('event: '):
+                current_event = update.replace('event: ', '').strip()
+            elif update.startswith('data: '):
+                try:
+                    json_string = update.replace('data: ', '').strip()
+                    current_data = json.loads(json_string)
+                    
+                    # Check if this is a complete event with data
+                    if current_event == 'complete' and current_data and current_data.get('status') == 'complete':
+                        final_data = current_data.get('data')  # Get the nested 'data' object
+                        logger.info(f"Captured final data for database save: {final_data.get('title') if final_data else 'No title'}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Could not parse JSON data from SSE event: {update}. Error: {e}")
 
         # After the stream is finished, save to DB if it was successful
         if final_data and current_user:
