@@ -355,16 +355,23 @@ class UniversalScraperPopup {
 
     // Handle SSE events
     handleSSEEvent(data) {
+        console.log('SSE Event received:', data);
+        
         switch (data.status) {
             case 'progress':
+                console.log('Progress update:', data.message, `(${data.current_stage}/${data.total_stages})`);
                 this.updateProgress(data);
                 break;
             case 'complete':
+                console.log('Scraping completed successfully:', data.data ? 'with data' : 'no data');
                 this.handleSuccess(data);
                 break;
             case 'error':
+                console.error('Scraping error:', data.error || 'Unknown error');
                 this.handleError(data);
                 break;
+            default:
+                console.warn('Unknown SSE event status:', data.status);
         }
     }
 
@@ -412,18 +419,34 @@ class UniversalScraperPopup {
 
     // Handle successful scraping
     handleSuccess(data) {
+        console.log('Handling success with data:', data);
+        
         this.hideAllTiers();
         this.resultsSummary.style.display = 'block';
+        
+        // Validate data structure
+        if (!data.data) {
+            console.error('Success event missing data payload');
+            this.showError('Scraping Error', 'Article was scraped but data is missing. Please try again.');
+            return;
+        }
         
         // Store article data
         this.currentArticleData.textContent = JSON.stringify(data.data);
         
-        // Update metadata
-        const metadata = data.data.metadata;
-        this.wordCount.textContent = `${metadata.word_count} words`;
-        this.readingTime.textContent = `${metadata.reading_time_minutes.toFixed(1)} min read`;
+        // Update metadata with error handling
+        try {
+            const metadata = data.data.metadata || {};
+            this.wordCount.textContent = `${metadata.word_count || 0} words`;
+            this.readingTime.textContent = `${(metadata.reading_time_minutes || 0).toFixed(1)} min read`;
+        } catch (error) {
+            console.error('Error updating metadata display:', error);
+            this.wordCount.textContent = '0 words';
+            this.readingTime.textContent = '0 min read';
+        }
         
         this.updateStatus('ready');
+        console.log('Success handling completed');
     }
 
     // Handle scraping error
@@ -711,6 +734,8 @@ class UniversalScraperPopup {
             if (response.ok) {
                 this.userPreferences = await response.json();
                 this.populatePreferencesForm();
+                // Show main content when preferences are successfully loaded
+                this.showMainContent();
             } else if (response.status === 404) {
                 // User doesn't have preferences set yet
                 this.showPreferencesSetup();
