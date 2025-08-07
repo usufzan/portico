@@ -340,11 +340,12 @@ class OptimizedUniversalScraper:
                     'Cache-Control': 'max-age=0'
                 }
             )
+            
+            # Apply stealth settings to the entire browser context
+            await stealth_async(context)
+            
             await context.route("**/*", block_requests)
             page = await context.new_page()
-            
-            # Apply stealth settings to the page
-            await stealth_async(page)
             
             # Enhanced anti-detection
             await page.add_init_script("""
