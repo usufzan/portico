@@ -21,6 +21,7 @@ from jose import JWTError, jwt
 # Your project's specific modules
 from config import WHITELIST, BLACKLIST
 from optimized_scraper import OptimizedUniversalScraper
+from free_proxy_manager import initialize_proxy_manager
 
 # =================================================================
 # SECTION 2: CONFIGURATION AND GLOBAL SETUP
@@ -171,6 +172,15 @@ async def lifespan(app: FastAPI):
     app.state.db = sqlite3.connect(DATABASE_URL)
     app.state.db.row_factory = sqlite3.Row  # Allows accessing columns by name
     logging.info("Database connection established.")
+    
+    # Initialize free proxy manager
+    try:
+        logging.info("Initializing free proxy manager...")
+        await initialize_proxy_manager()
+        logging.info("Free proxy manager initialized successfully.")
+    except Exception as e:
+        logging.warning(f"Failed to initialize proxy manager: {e}")
+    
     yield
     # Shutdown logic
     logging.info("Shutting down Universal Scraper API...")
@@ -205,6 +215,10 @@ async def generate_sse_events(url: str, user_id: Optional[str] = None):
     """Generate Server-Sent Events for the scraping workflow."""
     try:
         async with OptimizedUniversalScraper() as scraper:
+            # Enable free proxy rotation to bypass IP-based blocking
+            scraper.enable_free_proxy_rotation()
+            logger.info("Free proxy rotation enabled for scraping request")
+            
             async for update in scraper.run(str(url)):
                 # Convert WorkflowOutput to SSE format
                 event_data = {
