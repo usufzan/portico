@@ -64,6 +64,33 @@
             </div>
             <div class="preferences-error" id="preferencesError"></div>
         </div>
+
+        <!-- User Activity Section -->
+        <div class="section" id="userActivitySection" style="display: none;">
+            <h2>Your Activity</h2>
+            <p class="section-description">Track your usage and activity with the extension.</p>
+            
+            <div class="activity-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Account Created:</span>
+                    <span class="stat-value" id="accountCreated">Loading...</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Last Seen:</span>
+                    <span class="stat-value" id="lastSeen">Loading...</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Articles Scraped:</span>
+                    <span class="stat-value" id="articlesScraped">Loading...</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Site Requests:</span>
+                    <span class="stat-value" id="siteRequests">Loading...</span>
+                </div>
+            </div>
+            
+            <button id="refreshActivityButton" class="secondary-button">Refresh Activity</button>
+        </div>
     </div>
 
     <script src="options.js"></script>

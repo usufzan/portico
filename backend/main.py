@@ -125,6 +125,15 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+async def update_user_last_seen(db, user_id: int):
+    """Update the last_seen timestamp for a user."""
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+        (user_id,)
+    )
+    db.commit()
+
 async def get_current_user(request: Request, token: str = Depends(security)):
     credentials_exception = HTTPException(
         status_code=401,
@@ -144,6 +153,10 @@ async def get_current_user(request: Request, token: str = Depends(security)):
     
     if user is None:
         raise credentials_exception
+    
+    # Update last_seen timestamp
+    await update_user_last_seen(request.app.state.db, int(user_id))
+    
     return user
 
 # =================================================================
@@ -277,6 +290,9 @@ async def login_for_access_token(form_data: UserCreate, request: Request):
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Update last_seen timestamp on login
+    await update_user_last_seen(db, user['id'])
         
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -462,6 +478,41 @@ async def get_blacklist():
     return {
         "blacklist": BLACKLIST,
         "last_updated": datetime.now(timezone.utc).isoformat()
+    }
+
+@app.get("/api/v1/user/activity")
+async def get_user_activity(request: Request, current_user: sqlite3.Row = Depends(get_current_user)):
+    """Get current user's activity information."""
+    db = request.app.state.db
+    cursor = db.cursor()
+    
+    # Get user's basic info
+    user_info = cursor.execute(
+        "SELECT id, email, created_at, last_seen FROM users WHERE id = ?",
+        (current_user['id'],)
+    ).fetchone()
+    
+    # Get user's scraping activity count
+    scraping_count = cursor.execute(
+        "SELECT COUNT(*) FROM scraped_articles WHERE user_id = ?",
+        (current_user['id'],)
+    ).fetchone()[0]
+    
+    # Get user's site requests count
+    requests_count = cursor.execute(
+        "SELECT COUNT(*) FROM site_requests WHERE user_id = ?",
+        (current_user['id'],)
+    ).fetchone()[0]
+    
+    return {
+        "user_id": user_info['id'],
+        "email": user_info['email'],
+        "created_at": user_info['created_at'],
+        "last_seen": user_info['last_seen'],
+        "activity_stats": {
+            "articles_scraped": scraping_count,
+            "site_requests": requests_count
+        }
     }
 
 # =================================================================

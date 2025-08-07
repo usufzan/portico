@@ -26,11 +26,20 @@ class UniversalScraperOptions {
         this.savePreferencesButton = document.getElementById('savePreferencesButton');
         this.preferencesError = document.getElementById('preferencesError');
         this.status = document.getElementById('status');
+        
+        // User activity elements
+        this.userActivitySection = document.getElementById('userActivitySection');
+        this.accountCreated = document.getElementById('accountCreated');
+        this.lastSeen = document.getElementById('lastSeen');
+        this.articlesScraped = document.getElementById('articlesScraped');
+        this.siteRequests = document.getElementById('siteRequests');
+        this.refreshActivityButton = document.getElementById('refreshActivityButton');
     }
 
     bindEvents() {
         this.authButton.addEventListener('click', () => this.handleAuthButtonClick());
         this.savePreferencesButton.addEventListener('click', () => this.save_options());
+        this.refreshActivityButton.addEventListener('click', () => this.loadUserActivity());
     }
 
     async initialize() {
@@ -92,10 +101,13 @@ class UniversalScraperOptions {
 
     showAuthenticatedSections() {
         this.preferencesSection.style.display = 'block';
+        this.userActivitySection.style.display = 'block';
+        this.loadUserActivity(); // Load activity data when authenticated
     }
 
     showUnauthenticatedSections() {
         this.preferencesSection.style.display = 'none';
+        this.userActivitySection.style.display = 'none';
     }
 
     handleAuthButtonClick() {
@@ -211,6 +223,40 @@ class UniversalScraperOptions {
             return response.ok;
         } catch (error) {
             return false;
+        }
+    }
+
+    async loadUserActivity() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/v1/user/activity`, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (response.ok) {
+                const activityData = await response.json();
+                
+                // Format dates
+                const formatDate = (dateString) => {
+                    if (!dateString) return 'Unknown';
+                    const date = new Date(dateString);
+                    return date.toLocaleString();
+                };
+
+                this.accountCreated.textContent = formatDate(activityData.created_at);
+                this.lastSeen.textContent = formatDate(activityData.last_seen);
+                this.articlesScraped.textContent = activityData.activity_stats.articles_scraped;
+                this.siteRequests.textContent = activityData.activity_stats.site_requests;
+            } else {
+                throw new Error('Failed to load activity data');
+            }
+        } catch (error) {
+            console.error('Error loading user activity:', error);
+            this.accountCreated.textContent = 'Error loading data';
+            this.lastSeen.textContent = 'Error loading data';
+            this.articlesScraped.textContent = 'Error loading data';
+            this.siteRequests.textContent = 'Error loading data';
         }
     }
 }
