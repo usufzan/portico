@@ -17,7 +17,7 @@ from markdownify import markdownify as md
 from dateutil.parser import parse as parse_date
 from playwright.async_api import async_playwright, Page, Browser, Playwright, Error as PlaywrightError, Route
 from playwright_stealth import stealth
-from free_proxy_manager import get_proxy_manager
+from helper_proxy_manager import get_helper_proxy_manager
 
 # --- Constants and Data Models ---
 UNKNOWN_AUTHOR = "Unknown"
@@ -120,14 +120,14 @@ class OptimizedUniversalScraper:
             ],
             "retry_attempts": 2,
             "retry_delay": 1.0,
-            # Proxy configuration
-            "proxy_enabled": False,
-            "proxy_settings": {
+            # Helper proxy configuration
+            "helper_proxy_enabled": False,
+            "helper_proxy_settings": {
                 "server": None,  # e.g., "http://proxy.example.com:8080"
                 "username": None,
                 "password": None
             },
-            "proxy_rotation": {
+            "helper_proxy_rotation": {
                 "enabled": False,
                 "proxy_list": [],  # List of proxy dictionaries
                 "current_index": 0
@@ -201,29 +201,29 @@ class OptimizedUniversalScraper:
             "timestamp": self._start_time
         }
 
-    def _get_proxy_settings(self) -> Optional[Dict[str, str]]:
-        """Get current proxy settings for browser context."""
-        if not self.config.get("proxy_enabled", False):
+    def _get_helper_proxy_settings(self) -> Optional[Dict[str, str]]:
+        """Get current helper proxy settings for browser context."""
+        if not self.config.get("helper_proxy_enabled", False):
             return None
         
-        # Check if free proxy rotation is enabled
-        if self.config.get("free_proxy_rotation", False):
-            free_proxy = self._get_free_proxy()
-            if free_proxy:
-                return free_proxy
+        # Check if helper proxy rotation is enabled
+        if self.config.get("helper_proxy_rotation", False):
+            helper_proxy = self._get_helper_proxy()
+            if helper_proxy:
+                return helper_proxy
         
         # Check if proxy rotation is enabled
-        if self.config.get("proxy_rotation", {}).get("enabled", False):
-            proxy_list = self.config["proxy_rotation"]["proxy_list"]
+        if self.config.get("helper_proxy_rotation", {}).get("enabled", False):
+            proxy_list = self.config["helper_proxy_rotation"]["proxy_list"]
             if proxy_list:
-                current_index = self.config["proxy_rotation"]["current_index"]
+                current_index = self.config["helper_proxy_rotation"]["current_index"]
                 proxy = proxy_list[current_index % len(proxy_list)]
                 # Rotate to next proxy
-                self.config["proxy_rotation"]["current_index"] = (current_index + 1) % len(proxy_list)
+                self.config["helper_proxy_rotation"]["current_index"] = (current_index + 1) % len(proxy_list)
                 return proxy
         
-        # Use single proxy settings
-        proxy_settings = self.config.get("proxy_settings", {})
+        # Use single helper proxy settings
+        proxy_settings = self.config.get("helper_proxy_settings", {})
         if proxy_settings.get("server"):
             return {
                 "server": proxy_settings["server"],
@@ -233,49 +233,49 @@ class OptimizedUniversalScraper:
         
         return None
 
-    def enable_proxy(self, server: str, username: Optional[str] = None, password: Optional[str] = None):
-        """Enable single proxy configuration."""
-        self.config["proxy_enabled"] = True
-        self.config["proxy_settings"] = {
+    def enable_helper_proxy(self, server: str, username: Optional[str] = None, password: Optional[str] = None):
+        """Enable single helper proxy configuration."""
+        self.config["helper_proxy_enabled"] = True
+        self.config["helper_proxy_settings"] = {
             "server": server,
             "username": username,
             "password": password
         }
-        self.logger.info(f"Proxy enabled: {server}")
+        self.logger.info(f"Helper proxy enabled: {server}")
 
-    def enable_proxy_rotation(self, proxy_list: List[Dict[str, str]]):
-        """Enable proxy rotation with a list of proxies."""
-        self.config["proxy_enabled"] = True
-        self.config["proxy_rotation"] = {
+    def enable_helper_proxy_rotation(self, proxy_list: List[Dict[str, str]]):
+        """Enable helper proxy rotation with a list of proxies."""
+        self.config["helper_proxy_enabled"] = True
+        self.config["helper_proxy_rotation"] = {
             "enabled": True,
             "proxy_list": proxy_list,
             "current_index": 0
         }
-        self.logger.info(f"Proxy rotation enabled with {len(proxy_list)} proxies")
+        self.logger.info(f"Helper proxy rotation enabled with {len(proxy_list)} proxies")
 
-    def disable_proxy(self):
-        """Disable proxy usage."""
-        self.config["proxy_enabled"] = False
-        self.logger.info("Proxy disabled")
+    def disable_helper_proxy(self):
+        """Disable helper proxy usage."""
+        self.config["helper_proxy_enabled"] = False
+        self.logger.info("Helper proxy disabled")
 
-    def enable_free_proxy_rotation(self):
-        """Enable free proxy rotation using the FreeProxyManager."""
-        self.config["proxy_enabled"] = True
-        self.config["free_proxy_rotation"] = True
-        self.logger.info("Free proxy rotation enabled")
+    def enable_helper_proxy_rotation(self):
+        """Enable helper proxy rotation using the HelperProxyManager."""
+        self.config["helper_proxy_enabled"] = True
+        self.config["helper_proxy_rotation"] = True
+        self.logger.info("Helper proxy rotation enabled")
 
-    def _get_free_proxy(self) -> Optional[Dict[str, str]]:
-        """Get a free proxy from the proxy manager."""
-        if not self.config.get("free_proxy_rotation", False):
+    def _get_helper_proxy(self) -> Optional[Dict[str, str]]:
+        """Get a helper proxy from the proxy manager."""
+        if not self.config.get("helper_proxy_rotation", False):
             return None
         
         try:
-            proxy_manager = get_proxy_manager()
+            proxy_manager = get_helper_proxy_manager()
             proxy = proxy_manager.get_random_proxy()
             if proxy:
                 return proxy_manager.get_proxy_dict(proxy)
         except Exception as e:
-            self.logger.warning(f"Error getting free proxy: {e}")
+            self.logger.warning(f"Error getting helper proxy: {e}")
         
         return None
 
@@ -415,8 +415,8 @@ class OptimizedUniversalScraper:
                 else:
                     await route.continue_()
             
-            # Get proxy settings if enabled
-            proxy_settings = self._get_proxy_settings()
+            # Get helper proxy settings if enabled
+            proxy_settings = self._get_helper_proxy_settings()
             context_kwargs = {
                 'user_agent': self.config['user_agent'],
                 'viewport': {'width': 1920, 'height': 1080},
@@ -434,10 +434,10 @@ class OptimizedUniversalScraper:
                 }
             }
             
-            # Add proxy if configured
+            # Add helper proxy if configured
             if proxy_settings:
                 context_kwargs['proxy'] = proxy_settings
-                self.logger.info(f"Using proxy: {proxy_settings.get('server', 'Unknown')}")
+                self.logger.info(f"Using helper proxy: {proxy_settings.get('server', 'Unknown')}")
             
             context = await self._browser.new_context(**context_kwargs)
             

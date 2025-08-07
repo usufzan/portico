@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
 """
-Free Proxy Example for OptimizedUniversalScraper
+Helper Proxy Example for OptimizedUniversalScraper
 
-This script demonstrates how to use the free proxy rotation feature
-to bypass IP-based blocking without paying for proxy services.
+This script demonstrates how to use the helper proxy rotation feature
+as an optional enhancement to improve success rates on some protected sites.
 """
 
 import asyncio
 import logging
 from optimized_scraper import OptimizedUniversalScraper
-from free_proxy_manager import initialize_proxy_manager, get_proxy_manager
+from helper_proxy_manager import initialize_helper_proxy_manager, get_helper_proxy_manager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def example_free_proxy_rotation():
-    """Example: Using free proxy rotation."""
-    print("=== Free Proxy Rotation Example ===")
+async def example_helper_proxy_rotation():
+    """Example: Using helper proxy rotation."""
+    print("=== Helper Proxy Rotation Example ===")
     
     # Initialize the proxy manager first
-    print("Initializing free proxy manager...")
-    proxy_manager = await initialize_proxy_manager()
+    print("Initializing helper proxy manager...")
+    proxy_manager = await initialize_helper_proxy_manager()
     
     # Get proxy statistics
     stats = proxy_manager.get_stats()
     print(f"Proxy Stats: {stats}")
     
     async with OptimizedUniversalScraper() as scraper:
-        # Enable free proxy rotation
-        scraper.enable_free_proxy_rotation()
+        # Enable helper proxy rotation
+        scraper.enable_helper_proxy_rotation()
         
         # Test URLs (these are the ones that were failing due to IP blocking)
         test_urls = [
@@ -69,11 +69,11 @@ async def example_free_proxy_rotation():
 
 async def example_proxy_refresh():
     """Example: Manually refreshing the proxy list."""
-    print("\n=== Proxy Refresh Example ===")
+    print("\n=== Helper Proxy Refresh Example ===")
     
-    proxy_manager = get_proxy_manager()
+    proxy_manager = get_helper_proxy_manager()
     
-    print("Refreshing proxy list...")
+    print("Refreshing helper proxy list...")
     working_proxies = await proxy_manager.refresh_proxies(force=True)
     
     print(f"Found {len(working_proxies)} working proxies:")
@@ -82,9 +82,9 @@ async def example_proxy_refresh():
 
 async def example_proxy_validation():
     """Example: Testing proxy validation."""
-    print("\n=== Proxy Validation Example ===")
+    print("\n=== Helper Proxy Validation Example ===")
     
-    proxy_manager = get_proxy_manager()
+    proxy_manager = get_helper_proxy_manager()
     
     # Get a random proxy
     proxy = proxy_manager.get_random_proxy()
@@ -100,15 +100,15 @@ async def example_proxy_validation():
         print("No working proxies available")
 
 async def main():
-    """Run all free proxy examples."""
-    print("Free Proxy Usage Examples for OptimizedUniversalScraper")
+    """Run all helper proxy examples."""
+    print("Helper Proxy Usage Examples for OptimizedUniversalScraper")
     print("=" * 60)
-    print("This demonstrates how to use FREE proxies to bypass IP blocking!")
+    print("This demonstrates how to use helper proxies as an optional enhancement!")
     print("=" * 60)
     
     try:
-        # Example 1: Free proxy rotation with scraping
-        await example_free_proxy_rotation()
+        # Example 1: Helper proxy rotation with scraping
+        await example_helper_proxy_rotation()
         
         # Example 2: Manual proxy refresh
         await example_proxy_refresh()
@@ -121,9 +121,9 @@ async def main():
         logger.exception("Main execution failed")
     
     print("\n" + "=" * 60)
-    print("Free proxy examples completed!")
+    print("Helper proxy examples completed!")
     print("\nKey Benefits:")
-    print("✅ Completely FREE - no paid services needed")
+    print("✅ Optional enhancement - not critical for core functionality")
     print("✅ Automatic rotation - each request uses different IP")
     print("✅ Self-healing - automatically removes failed proxies")
     print("✅ Multiple sources - fetches from 4+ reliable providers")

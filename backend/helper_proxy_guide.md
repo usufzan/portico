@@ -1,13 +1,14 @@
-# 🆓 Free Proxy Solution Guide
+# 🛠️ Helper Proxy Enhancement Guide
 
-## 🎯 **Complete Free Proxy Solution - No Payment Required!**
+## 🎯 **Optional Helper Proxy Enhancement - Non-Critical Enhancement**
 
-I've implemented a **robust, completely free proxy solution** that addresses your IP-based blocking issue without requiring any paid services. This system automatically fetches, validates, and rotates through high-quality free proxies from multiple reliable sources.
+I've implemented an **optional helper proxy enhancement** that can improve success rates on some protected sites by providing IP diversity. This system automatically fetches, validates, and rotates through high-quality free proxies from multiple reliable sources as a helpful enhancement.
 
 ## 🚀 **Key Features**
 
-### **✅ Completely Free**
-- **No paid services** - Uses only free, public proxy sources
+### **✅ Optional Enhancement**
+- **Non-critical** - Core scraper works without proxies
+- **Helpful addition** - Can improve success rates on some sites
 - **No registration required** - Works out of the box
 - **No API keys needed** - Fully autonomous operation
 
@@ -67,22 +68,22 @@ cd backend
 pip install aiohttp>=3.8.0
 ```
 
-### **Step 2: Enable Free Proxy Rotation**
+### **Step 2: Enable Helper Proxy Rotation**
 ```python
 async with OptimizedUniversalScraper() as scraper:
-    # Enable free proxy rotation
-    scraper.enable_free_proxy_rotation()
+    # Enable helper proxy rotation as optional enhancement
+    scraper.enable_helper_proxy_rotation()
     
     # Your scraping code here
     async for update in scraper.run(url):
-        # Each request will use a different free proxy
+        # Each request will use a different helper proxy
         pass
 ```
 
 ### **Step 3: Test the Setup**
 ```bash
 cd backend
-python3 free_proxy_example.py
+python3 helper_proxy_example.py
 ```
 
 ## 🎯 **Expected Results**
