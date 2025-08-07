@@ -18,6 +18,7 @@ from dateutil.parser import parse as parse_date
 from playwright.async_api import async_playwright, Page, Browser, Playwright, Error as PlaywrightError, Route
 from playwright_stealth import stealth
 from helper_proxy_manager import get_helper_proxy_manager
+from config_utils import get_default_config, merge_configs, validate_config
 
 # --- Constants and Data Models ---
 UNKNOWN_AUTHOR = "Unknown"
@@ -85,10 +86,13 @@ class OptimizedUniversalScraper:
     """
     
     def __init__(self, config: Optional[Dict] = None, logger: Optional[logging.Logger] = None):
-        self.config = {
+        # Use shared configuration with sensible defaults
+        base_config = get_default_config()
+        
+        # Add scraper-specific selectors and settings
+        scraper_config = {
             "goto_timeout": 45000,
             "requests_timeout": 15,
-            "user_agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
             "cookie_consent_selectors": [
                 'button#didomi-notice-agree-button', 
                 'button[data-testid="uc-accept-all-button"]', 
@@ -118,23 +122,23 @@ class OptimizedUniversalScraper:
                 "adservice.google.com", "chartbeat.com", "facebook.com",
                 "twitter.com", "linkedin.com"
             ],
-            "retry_attempts": 2,
-            "retry_delay": 1.0,
-            # Helper proxy configuration
-            "helper_proxy_enabled": False,
             "helper_proxy_settings": {
-                "server": None,  # e.g., "http://proxy.example.com:8080"
+                "server": None,
                 "username": None,
                 "password": None
-            },
-            "helper_proxy_rotation": {
-                "enabled": False,
-                "proxy_list": [],  # List of proxy dictionaries
-                "current_index": 0
             }
         }
+        
+        # Merge configurations
+        self.config = merge_configs(base_config, scraper_config)
         if config:
-            self.config.update(config)
+            self.config = merge_configs(self.config, config)
+        
+        # Validate configuration
+        if not validate_config(self.config):
+            raise ValueError("Invalid configuration provided")
+        
+        # Initialize logger and state
         self.logger = logger or logging.getLogger(__name__)
         self._playwright: Optional[Playwright] = None
         self._browser: Optional[Browser] = None
@@ -145,16 +149,8 @@ class OptimizedUniversalScraper:
         self.logger.info("Initializing Playwright...")
         self._playwright = await async_playwright().start()
         self._browser = await self._playwright.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',  # Required for Docker/CI environments
-                '--disable-dev-shm-usage',  # Prevents memory issues in containers
-                '--disable-blink-features=AutomationControlled',  # Bypasses bot detection
-                '--disable-extensions',  # Reduces memory usage and potential conflicts
-                '--disable-images',  # Improves performance for text extraction
-                '--no-first-run',  # Skips first-run setup dialogs
-                '--disable-default-apps'  # Prevents default app installation
-            ]
+            headless=self.config["headless"],
+            args=self.config["browser_args"]
         )
         return self
 
@@ -191,21 +187,9 @@ class OptimizedUniversalScraper:
         if not self.config.get("helper_proxy_enabled", False):
             return None
         
-        # Check if rotation is enabled (either boolean or dict with enabled=True)
-        rotation_config = self.config.get("helper_proxy_rotation", False)
-        if rotation_config:
-            if isinstance(rotation_config, bool):
-                # Use HelperProxyManager
-                return self._get_helper_proxy()
-            elif isinstance(rotation_config, dict) and rotation_config.get("enabled"):
-                # Use custom proxy list
-                proxy_list = rotation_config.get("proxy_list", [])
-                if proxy_list:
-                    current_index = rotation_config.get("current_index", 0)
-                    proxy = proxy_list[current_index % len(proxy_list)]
-                    # Rotate to next proxy
-                    rotation_config["current_index"] = (current_index + 1) % len(proxy_list)
-                    return proxy
+        # Use HelperProxyManager for rotation
+        if self.config.get("helper_proxy_rotation", False):
+            return self._get_helper_proxy()
         
         # Use single proxy settings
         proxy_settings = self.config.get("helper_proxy_settings", {})
@@ -228,20 +212,11 @@ class OptimizedUniversalScraper:
         }
         self.logger.info(f"Helper proxy enabled: {server}")
 
-    def enable_helper_proxy_rotation(self, proxy_list: Optional[List[Dict[str, str]]] = None):
-        """Enable helper proxy rotation. If proxy_list provided, uses custom list; otherwise uses HelperProxyManager."""
+    def enable_helper_proxy_rotation(self):
+        """Enable helper proxy rotation using HelperProxyManager."""
         self.config["helper_proxy_enabled"] = True
-        
-        if proxy_list:
-            self.config["helper_proxy_rotation"] = {
-                "enabled": True,
-                "proxy_list": proxy_list,
-                "current_index": 0
-            }
-            self.logger.info(f"Helper proxy rotation enabled with {len(proxy_list)} custom proxies")
-        else:
-            self.config["helper_proxy_rotation"] = True
-            self.logger.info("Helper proxy rotation enabled using HelperProxyManager")
+        self.config["helper_proxy_rotation"] = True
+        self.logger.info("Helper proxy rotation enabled")
 
     def disable_helper_proxy(self):
         """Disable helper proxy usage."""
@@ -404,18 +379,7 @@ class OptimizedUniversalScraper:
             context_kwargs = {
                 'user_agent': self.config['user_agent'],
                 'viewport': {'width': 1920, 'height': 1080},
-                # Add more realistic headers
-                'extra_http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Cache-Control': 'max-age=0'
-                }
+                'extra_http_headers': self.config['http_headers']
             }
             
             # Add helper proxy if configured
