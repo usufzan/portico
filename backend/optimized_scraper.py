@@ -19,6 +19,7 @@ from playwright.async_api import async_playwright, Page, Browser, Playwright, Er
 from playwright_stealth import stealth
 from helper_proxy_manager import get_helper_proxy_manager
 from config_utils import get_default_config, merge_configs, validate_config
+from workflow_utils import WorkflowManager, WorkflowStage, WorkflowOutput, validate_url
 
 # --- Constants and Data Models ---
 UNKNOWN_AUTHOR = "Unknown"
@@ -174,13 +175,7 @@ class OptimizedUniversalScraper:
         
         raise ScraperError("Unexpected end of workflow")
 
-    def _get_performance_metrics(self) -> Dict[str, float]:
-        """Calculate performance metrics."""
-        elapsed_time = time.time() - self._start_time
-        return {
-            "total_elapsed_time_seconds": elapsed_time,
-            "timestamp": self._start_time
-        }
+    # Performance metrics now handled by WorkflowManager
 
     def _get_helper_proxy_settings(self) -> Optional[Dict[str, str]]:
         """Get current helper proxy settings for browser context."""
@@ -238,83 +233,61 @@ class OptimizedUniversalScraper:
         
         return None
 
-    def _create_workflow_output(
-        self, 
-        status: str, 
-        stage: WorkflowStage, 
-        current_stage: int, 
-        total_stages: int,
-        message: str,
-        data: Optional[Dict[str, Any]] = None,
-        error: Optional[str] = None
-    ) -> WorkflowOutput:
-        """Create consistent workflow output structure."""
-        return WorkflowOutput(
-            status=status,
-            stage=stage.value,
-            total_stages=total_stages,
-            current_stage=current_stage,
-            message=message,
-            data=data,
-            error=error,
-            performance_metrics=self._get_performance_metrics()
-        )
+    # Workflow output creation now handled by WorkflowManager
 
     # --- The Main Orchestrator Method ---
     async def run(self, url: str) -> AsyncGenerator[WorkflowOutput, None]:
         """
         Executes the optimized adaptive scraping workflow with consistent output structure.
         """
-        total_stages = 6
-        current_stage = 0
+        workflow = WorkflowManager(total_stages=6, logger=self.logger)
+        workflow.start_workflow()
         
-        # Stage 0: Initialization
-        current_stage += 1
-        yield self._create_workflow_output(
-            "progress", WorkflowStage.INITIALIZATION, current_stage, total_stages,
+        # Stage 1: Initialization
+        workflow.next_stage()
+        yield workflow.yield_progress(
+            WorkflowStage.INITIALIZATION,
             "Initializing scraper and validating URL..."
         )
         
         # Validate URL
-        try:
-            parsed_url = urlparse(url)
-            if not parsed_url.scheme or not parsed_url.netloc:
-                raise ValidationError("Invalid URL format")
-        except Exception as e:
-            yield self._create_workflow_output(
-                "error", WorkflowStage.INITIALIZATION, current_stage, total_stages,
-                "URL validation failed", error=str(e)
+        if not validate_url(url):
+            yield workflow.yield_error(
+                WorkflowStage.INITIALIZATION,
+                "Invalid URL format",
+                "URL validation failed"
             )
             return
 
-        # Stage 1: Fast Path Attempt
-        current_stage += 1
-        yield self._create_workflow_output(
-            "progress", WorkflowStage.FAST_PATH, current_stage, total_stages,
+        # Stage 2: Fast Path Attempt
+        workflow.next_stage()
+        yield workflow.yield_progress(
+            WorkflowStage.FAST_PATH,
             "Attempting fast scrape with requests..."
         )
         
         try:
             article_data = await self._run_fast_path(url)
             article_data.workflow_stages.append(WorkflowStage.FAST_PATH.value)
-            article_data.performance_metrics = self._get_performance_metrics()
+            article_data.performance_metrics = workflow.get_performance_metrics()
             
-            yield self._create_workflow_output(
-                "complete", WorkflowStage.COMPLETION, total_stages, total_stages,
-                "Fast path successful", data=asdict(article_data)
+            yield workflow.yield_complete(
+                asdict(article_data),
+                "Fast path successful"
             )
             self.logger.info(f"Success on Fast Path for {url}")
             return
             
         except Exception as e:
             self.logger.warning(f"Fast Path failed for {url}: {e}. Escalating to full browser...")
-            yield self._create_workflow_output(
-                "progress", WorkflowStage.FAST_PATH, current_stage, total_stages,
-                f"Fast scrape failed, escalating to robust path...", error=str(e)
+            yield workflow.yield_progress(
+                WorkflowStage.FAST_PATH,
+                f"Fast scrape failed, escalating to robust path...",
+                {"error": str(e)}
             )
 
-        # Stage 2-5: Robust Path with Playwright
-        async for update in self._run_robust_path(url, current_stage, total_stages):
+        # Stage 3+: Robust Path (Full Browser)
+        async for update in self._run_robust_path(url, workflow):
             yield update
 
     async def _run_fast_path(self, url: str) -> Article:
@@ -347,23 +320,23 @@ class OptimizedUniversalScraper:
                     raise NavigationError(f"Requests failed to fetch URL after {self.config['retry_attempts']} attempts: {e}") from e
                 await asyncio.sleep(self.config['retry_delay'])
 
-    async def _run_robust_path(self, url: str, start_stage: int, total_stages: int) -> AsyncGenerator[WorkflowOutput, None]:
+    async def _run_robust_path(self, url: str, workflow: WorkflowManager) -> AsyncGenerator[WorkflowOutput, None]:
         """Optimized robust path using Playwright with enhanced error handling."""
         if not self._browser:
-            yield self._create_workflow_output(
-                "error", WorkflowStage.ROBUST_PATH, start_stage, total_stages,
-                "Browser not initialized", error="Browser initialization failed"
+            yield workflow.yield_error(
+                WorkflowStage.ROBUST_PATH,
+                "Browser initialization failed",
+                "Browser not initialized"
             )
             return
             
         context = None
-        current_stage = start_stage
         
         try:
-            # Stage 2: Browser Context Setup
-            current_stage += 1
-            yield self._create_workflow_output(
-                "progress", WorkflowStage.ROBUST_PATH, current_stage, total_stages,
+            # Stage 3: Browser Context Setup
+            workflow.next_stage()
+            yield workflow.yield_progress(
+                WorkflowStage.ROBUST_PATH,
                 "Creating optimized browser context..."
             )
             
@@ -451,45 +424,48 @@ class OptimizedUniversalScraper:
             await self._navigate_and_consent(page, url)
             
             # Stage 4: Content Extraction
-            current_stage += 1
-            yield self._create_workflow_output(
-                "progress", WorkflowStage.CONTENT_EXTRACTION, current_stage, total_stages,
+            workflow.next_stage()
+            yield workflow.yield_progress(
+                WorkflowStage.CONTENT_EXTRACTION,
                 "Extracting page content..."
             )
             
             raw_html = await page.content()
             
             # Stage 5: Content Processing
-            current_stage += 1
-            yield self._create_workflow_output(
-                "progress", WorkflowStage.METADATA_EXTRACTION, current_stage, total_stages,
+            workflow.next_stage()
+            yield workflow.yield_progress(
+                WorkflowStage.METADATA_EXTRACTION,
                 "Processing content and extracting metadata..."
             )
             
             article_data = self._parse_html_content(url, raw_html)
             article_data.scraped_with = ScrapingMethod.PLAYWRIGHT.value
             article_data.workflow_stages = [stage.value for stage in WorkflowStage]
+            article_data.performance_metrics = workflow.get_performance_metrics()
             
             # Enhanced validation
             await self._validate_article(article_data)
             
             # Stage 6: Completion
-            yield self._create_workflow_output(
-                "complete", WorkflowStage.COMPLETION, total_stages, total_stages,
-                "Robust path completed successfully", data=asdict(article_data)
+            yield workflow.yield_complete(
+                asdict(article_data),
+                "Robust path completed successfully"
             )
             
         except ScraperError as e:
             self.logger.error(f"A scraper error occurred for {url}: {e}")
-            yield self._create_workflow_output(
-                "error", WorkflowStage.ROBUST_PATH, current_stage, total_stages,
-                f"Scraper error: {type(e).__name__}", error=str(e)
+            yield workflow.yield_error(
+                WorkflowStage.ROBUST_PATH,
+                str(e),
+                f"Scraper error: {type(e).__name__}"
             )
         except Exception as e:
             self.logger.exception(f"An unexpected error occurred for {url}: {e}")
-            yield self._create_workflow_output(
-                "error", WorkflowStage.ROBUST_PATH, current_stage, total_stages,
-                "Unexpected error occurred", error=str(e)
+            yield workflow.yield_error(
+                WorkflowStage.ROBUST_PATH,
+                str(e),
+                "Unexpected error occurred"
             )
         finally:
             if context:
