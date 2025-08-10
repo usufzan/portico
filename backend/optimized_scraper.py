@@ -300,7 +300,7 @@ class OptimizedUniversalScraper:
             'Connection': 'keep-alive',
         }
         
-        for attempt in range(self.config['retry_attempts']):
+        for attempt in range(self.config['max_retries']):
             try:
                 response = await asyncio.to_thread(
                     requests.get, url, headers=headers, timeout=self.config['requests_timeout']
@@ -316,8 +316,8 @@ class OptimizedUniversalScraper:
                 return article
                 
             except requests.RequestException as e:
-                if attempt == self.config['retry_attempts'] - 1:
-                    raise NavigationError(f"Requests failed to fetch URL after {self.config['retry_attempts']} attempts: {e}") from e
+                if attempt == self.config['max_retries'] - 1:
+                    raise NavigationError(f"Requests failed to fetch URL after {self.config['max_retries']} attempts: {e}") from e
                 await asyncio.sleep(self.config['retry_delay'])
 
     async def _run_robust_path(self, url: str, workflow: WorkflowManager) -> AsyncGenerator[WorkflowOutput, None]:
@@ -415,9 +415,9 @@ class OptimizedUniversalScraper:
             """)
             
             # Stage 3: Navigation
-            current_stage += 1
-            yield self._create_workflow_output(
-                "progress", WorkflowStage.NAVIGATION, current_stage, total_stages,
+            workflow.next_stage()
+            yield workflow.yield_progress(
+                WorkflowStage.NAVIGATION,
                 "Navigating with full browser capabilities..."
             )
             
