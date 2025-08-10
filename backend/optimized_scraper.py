@@ -31,15 +31,7 @@ class ScrapingMethod(Enum):
     REQUESTS = "requests"
     PLAYWRIGHT = "playwright"
 
-class WorkflowStage(Enum):
-    INITIALIZATION = "initialization"
-    FAST_PATH = "fast_path"
-    ROBUST_PATH = "robust_path"
-    NAVIGATION = "navigation"
-    CONTENT_EXTRACTION = "content_extraction"
-    METADATA_EXTRACTION = "metadata_extraction"
-    VALIDATION = "validation"
-    COMPLETION = "completion"
+# WorkflowStage enum imported from workflow_utils
 
 class ScraperError(Exception): pass
 class NavigationError(ScraperError): pass
@@ -68,16 +60,7 @@ class Article:
     workflow_stages: List[str] = field(default_factory=list)
     performance_metrics: Dict[str, float] = field(default_factory=dict)
 
-@dataclass
-class WorkflowOutput:
-    status: str
-    stage: str
-    total_stages: int
-    current_stage: int
-    message: str
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    performance_metrics: Dict[str, float] = field(default_factory=dict)
+# WorkflowOutput class imported from workflow_utils
 
 # --- Main Scraper Class ---
 class OptimizedUniversalScraper:
