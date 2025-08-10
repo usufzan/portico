@@ -11,6 +11,7 @@ import aiohttp
 import time
 import random
 import logging
+import ssl
 from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -55,9 +56,14 @@ class HelperProxyManager:
         """Fetch proxies from multiple reliable free sources."""
         all_proxies = []
         
+        # Create SSL context that ignores certificate verification for proxy fetching
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
         # Source 1: FreeProxyList.net
         try:
-            proxies = await self._fetch_from_freeproxylist()
+            proxies = await self._fetch_from_freeproxylist(ssl_context)
             all_proxies.extend(proxies)
             self.logger.info(f"Fetched {len(proxies)} proxies from FreeProxyList.net")
         except Exception as e:
@@ -65,7 +71,7 @@ class HelperProxyManager:
         
         # Source 2: ProxyScrape.com
         try:
-            proxies = await self._fetch_from_proxyscrape()
+            proxies = await self._fetch_from_proxyscrape(ssl_context)
             all_proxies.extend(proxies)
             self.logger.info(f"Fetched {len(proxies)} proxies from ProxyScrape.com")
         except Exception as e:
@@ -73,7 +79,7 @@ class HelperProxyManager:
         
         # Source 3: Geonode Free Proxy List
         try:
-            proxies = await self._fetch_from_geonode()
+            proxies = await self._fetch_from_geonode(ssl_context)
             all_proxies.extend(proxies)
             self.logger.info(f"Fetched {len(proxies)} proxies from Geonode")
         except Exception as e:
@@ -81,7 +87,7 @@ class HelperProxyManager:
         
         # Source 4: ProxyNova
         try:
-            proxies = await self._fetch_from_proxynova()
+            proxies = await self._fetch_from_proxynova(ssl_context)
             all_proxies.extend(proxies)
             self.logger.info(f"Fetched {len(proxies)} proxies from ProxyNova")
         except Exception as e:
@@ -93,10 +99,11 @@ class HelperProxyManager:
         
         return unique_proxies
     
-    async def _fetch_from_freeproxylist(self) -> List[ProxyInfo]:
+    async def _fetch_from_freeproxylist(self, ssl_context: ssl.SSLContext) -> List[ProxyInfo]:
         """Fetch proxies from FreeProxyList.net."""
         url = "https://free-proxy-list.net/"
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url, timeout=self.timeout) as response:
                 if response.status == 200:
                     html = await response.text()
@@ -118,7 +125,7 @@ class HelperProxyManager:
                     return proxies
         return []
     
-    async def _fetch_from_proxyscrape(self) -> List[ProxyInfo]:
+    async def _fetch_from_proxyscrape(self, ssl_context: ssl.SSLContext) -> List[ProxyInfo]:
         """Fetch proxies from ProxyScrape.com."""
         urls = [
             "https://api.proxyscrape.com/v2/?request=get&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all",
@@ -126,7 +133,8 @@ class HelperProxyManager:
         ]
         
         all_proxies = []
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             for url in urls:
                 try:
                     async with session.get(url, timeout=self.timeout) as response:
@@ -150,11 +158,12 @@ class HelperProxyManager:
         
         return all_proxies
     
-    async def _fetch_from_geonode(self) -> List[ProxyInfo]:
+    async def _fetch_from_geonode(self, ssl_context: ssl.SSLContext) -> List[ProxyInfo]:
         """Fetch proxies from Geonode Free Proxy List."""
         url = "https://proxylist.geonode.com/api/proxy-list?limit=100&page=1&sort_by=lastChecked&sort_type=desc&protocols=http%2Chttps&anonymityLevel=elite&country=US"
         
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             try:
                 async with session.get(url, timeout=self.timeout) as response:
                     if response.status == 200:
@@ -179,11 +188,12 @@ class HelperProxyManager:
         
         return []
     
-    async def _fetch_from_proxynova(self) -> List[ProxyInfo]:
+    async def _fetch_from_proxynova(self, ssl_context: ssl.SSLContext) -> List[ProxyInfo]:
         """Fetch proxies from ProxyNova."""
         url = "https://www.proxynova.com/proxy-server-list/"
         
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             try:
                 async with session.get(url, timeout=self.timeout) as response:
                     if response.status == 200:
